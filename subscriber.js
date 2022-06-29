@@ -1,9 +1,50 @@
-/** @typedef {(e: JQuery.TriggeredEvent?) => number|string} ReactiveFunction */
+//@ts-check
 
+/** @typedef {(e: JQuery.TriggeredEvent?) => number|string} ReactiveFunction */
 /**
  * Creates a subscription object that can subscribe to other JQuery elements to accomplish reactivity.
  * If that element changes (on("input change")), then the function provided to this object is fired and this element changes as well.
- * @template {ReactiveFunction} T
+ * @template {ReactiveFunction} T Some reactive function.
+ * @example
+ * // Creating new element <input> that is subscribed to existing and future elements "#foo" and "#bar"
+ * const sub = Subscriber.NewElementAsSubscriber((e) => 0, "input", "#foo", "#bar");
+ * sub.subscribe((e) => 2, "#biz");
+ * sub.subscribe((e) => 3, "#baz");
+ * 
+ * // Attach the newly created element to DOM
+ * $(document).append(sub.element);
+ * 
+ * // example of reactivity
+ * $(sub.selector()).val(49);
+ * console.log($(sub.selector()).val()); // yields '49'
+ * $("#foo").trigger("change");
+ * console.log($(sub.selector()).val()); // yields '0'
+ * $("#baz").trigger("change");
+ * console.log($(sub.selector()).val()); // yields '3'
+ * 
+ * // example of unsubscribe()
+ * sub.unsubscribe();
+ * $("#bar").trigger("change");
+ * console.log($(sub.selector()).val()); // yields '3'
+ * sub.resubscribe(); // resubscribes to all past subscriptions
+ * $("#bar").trigger("change");
+ * console.log($(sub.selector()).val()); // yields '0'
+ * $("#biz").trigger("change");
+ * console.log($(sub.selector()).val()); // yields '2'
+ * 
+ * // example of clear()
+ * sub.clear();
+ * $("#baz").trigger("change");
+ * console.log($(sub.selector()).val()); // yields '2'
+ * sub.resubscribe(); // does nothing.
+ * $("#baz").trigger("change");
+ * console.log($(sub.selector()).val()); // yields '2'
+ * sub.subscribe((e) => 3, "#baz"); // must explicitly redefine the subscription.
+ * $("#baz").trigger("change");
+ * console.log($(sub.selector()).val()); // yields '3'
+ * sub.subscribe("#foo");
+ * $("#foo").trigger("change"); // base reaction handling function created through constructor still remains.
+ * console.log($(sub.selector()).val()); // yields '0'
  */
 class Subscriber {
     /** @type {JQuery<HTMLElement>} JQuery HTMLElement that is provided (or created) through the constructor */
@@ -70,8 +111,9 @@ class Subscriber {
      * Creates a new Subscriber given the generic parameter T (the type of trigger function)
      * @param {JQuery<HTMLElement> | string} el JQuery HTML Element, JQuery CSS Selector, OR "<element></element>" type to create new.
      * @param {T} f Trigger function for handling reactivity.
+     * @param {string} id Id of the element. (This parameter should be used if the Subscriber element does not exist yet.)
      */
-    constructor(el, f=null) {
+    constructor(el, f=null, id=null) {
         if(typeof(el) === "string") {
             if(/<(.*)><\/(.*)>/.test(el)) {
                 this.element = $(el);
@@ -84,7 +126,7 @@ class Subscriber {
             }
         } else {
             this.element = el;
-            this.id = /** @type {JQuery<HTMLElement>}*/(el).attr("id");
+            this.id = id ?? /** @type {JQuery<HTMLElement>}*/(el).attr("id");
         }
         this.fire = f;
     }
@@ -117,6 +159,7 @@ class Subscriber {
      * console.log($("#my-element").val()); // yields "0"
      */
     subscribe(f=null, ...selectors) {
+        console.log(f, selectors);
         const sub = (/** @type {string} */sel) =>  {
             $(document).on("input change", sel, (e) => {
                 /** @type {number|string} */
@@ -133,7 +176,7 @@ class Subscriber {
                 $(this.selector()).trigger("change");
             });
         }
-        if(f === "string") sub(f);
+        if(typeof(f) === "string") sub(f);
         for(let sel of selectors) {
             sub(sel);
         }
