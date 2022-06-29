@@ -1,0 +1,31 @@
+<head>
+    <script src="https://code.jquery.com/jquery-3.6.0.js"
+        integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk=" crossorigin="anonymous"></script>
+    <script src="subscriber.js"></script>
+</head>
+
+<div id="example">
+    <button onclick="addExistingFoo()">Add existing subscriber: "foo"</button>
+    <button onclick="addNewFoo()">Add new subscriber: "foo"</button>
+    <input id="bar" type="number" value="0">
+    <input id="biz" type="number" value="1">
+</div>
+
+<script>
+    // Create reactive subscriber for an element (or elements) that will exist in the future.
+    const sub = new Subscriber($("#example input#foo"), (e) => parseInt($("div#example input#bar").val()) + parseInt($("div#example input#biz").val()), "foo");
+    sub.subscribe("div#example input#bar", "div#example input#biz");
+
+    function addExistingFoo() {
+        const el = $("<input></input>");
+        el.attr("id", "foo");
+        $("#example").append(el);
+        sub.resubscribe();
+    }
+
+    function addNewFoo() {
+        const newSub = new Subscriber("<input></input>", e => parseInt($("div#example input#bar").val()) - parseInt($("div#example input#biz").val()));
+        $("#example").append(newSub.element);
+        newSub.subscribe("div#example input#bar", "div#example input#biz");
+    }
+</script>
