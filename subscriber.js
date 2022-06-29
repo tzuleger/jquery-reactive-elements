@@ -51,8 +51,12 @@ class Subscriber {
     element;
     /** @type {string} Randomly generated id assigned to JQuery HTMLElement (provided or created through constructor) */
     id;
+    /** @type {T} Maintains the original function that was created through constructor */
+    original;
     /** @type {T} */
     fire;
+    /** @type {boolean} Used to keep a backup */
+    cleared = false;
     /** @type {string[]} Element selectors that this subscription is subscribed to. */
     subscriptions = [];
 
@@ -128,7 +132,7 @@ class Subscriber {
             this.element = el;
             this.id = id ?? /** @type {JQuery<HTMLElement>}*/(el).attr("id");
         }
-        this.fire = f;
+        this.original = this.fire = f;
     }
 
     /**
@@ -159,12 +163,15 @@ class Subscriber {
      * console.log($("#my-element").val()); // yields "0"
      */
     subscribe(f=null, ...selectors) {
-        console.log(f, selectors);
+        if(this.cleared) {
+            this.fire = this.original;
+            this.cleared = false;
+        }
         const sub = (/** @type {string} */sel) =>  {
             $(document).on("input change", sel, (e) => {
                 /** @type {number|string} */
                 let val;
-                if(typeof(f) !== "string") {
+                if(f != null && typeof(f) !== "string") {
                     val = f(e);
                 } else if(this.fire) {
                     val = this.fire(e);
@@ -175,33 +182,32 @@ class Subscriber {
                 $(this.selector()).val(val);
                 $(this.selector()).trigger("change");
             });
+            this.subscriptions = [...this.subscriptions, sel];
         }
         if(typeof(f) === "string") sub(f);
         for(let sel of selectors) {
             sub(sel);
         }
-        this.subscriptions = [...this.subscriptions, ...selectors];
     }
 
     /**
      * Unsubscribes from all elements that this Subscriber subscribed to.
      */
     unsubscribe() {
-        const unsub = (/** @type {string} */ sel) => {
-            $(document).off("input change", sel);
-        }
-        for(let sel of this.subscriptions) {
-            unsub(sel);
-        }
+        this.fire = (e) => parseInt(/** @type {string} */($(this.selector()).val()));
     }
 
     /**
      * Resubscribes to all subscriptions that have previously been subscribed to.
      */
     resubscribe() {
-        const selectors = [...this.subscriptions];
-        this.clear();
-        this.subscribe(selectors);
+        if(!this.cleared) {
+            const selectors = [...this.subscriptions];
+            this.unsubscribe();
+            this.subscriptions = [];
+            this.subscribe(null, ...selectors);
+            this.fire = this.original;
+        }
     }
 
     /**
@@ -210,6 +216,7 @@ class Subscriber {
     clear() {
         this.unsubscribe();
         this.subscriptions = [];
+        this.cleared = true;
     }
 
     /**
